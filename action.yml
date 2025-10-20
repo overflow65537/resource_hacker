@@ -39,73 +39,68 @@ runs:
   using: 'composite'
   steps:
     - name: Download Resource Hacker
-      shell: powershell
+      shell: pwsh
       run: |
         $ErrorActionPreference = 'Stop'
-        Write-Host "📥 Downloading Resource Hacker from official website..."
+        Write-Host "Downloading Resource Hacker from official website..."
         
-        $downloadUrl = "https://angusj.com/resourcehacker/resource_hacker.zip"
-        $tempZip = Join-Path $env:TEMP "resource_hacker.zip"
-        $extractPath = Join-Path $env:TEMP "ResourceHacker"
+        $url = "https://angusj.com/resourcehacker/resource_hacker.zip"
+        $zip = [System.IO.Path]::Combine($env:TEMP, "resource_hacker.zip")
+        $dest = [System.IO.Path]::Combine($env:TEMP, "ResourceHacker")
         
-        Write-Host "Download URL: $downloadUrl"
-        Write-Host "Temp ZIP: $tempZip"
-        Write-Host "Extract Path: $extractPath"
+        Write-Host "URL: $url"
+        Write-Host "ZIP: $zip"
+        Write-Host "DEST: $dest"
         
-        # Download
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $tempZip -UseBasicParsing
-        Write-Host "✅ Download completed"
+        Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+        Write-Host "Download completed"
         
-        # Extract
-        Write-Host "📂 Extracting Resource Hacker..."
-        if (Test-Path $extractPath) {
-          Remove-Item -Path $extractPath -Recurse -Force
+        Write-Host "Extracting Resource Hacker..."
+        if (Test-Path $dest) {
+          Remove-Item -Path $dest -Recurse -Force
         }
-        Expand-Archive -Path $tempZip -DestinationPath $extractPath -Force
+        Expand-Archive -Path $zip -DestinationPath $dest -Force
         
-        # Verify
-        $rhExe = Get-ChildItem -Path $extractPath -Filter "ResourceHacker.exe" -Recurse | Select-Object -First 1
-        if ($rhExe) {
-          Write-Host "✅ Resource Hacker extracted to: $($rhExe.FullName)"
-          $rhDir = $rhExe.DirectoryName
-          "RH_PATH=$rhDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        $exe = Get-ChildItem -Path $dest -Filter "ResourceHacker.exe" -Recurse | Select-Object -First 1
+        if ($exe) {
+          Write-Host "Resource Hacker found at: $($exe.FullName)"
+          $dir = $exe.DirectoryName
+          Add-Content -Path $env:GITHUB_ENV -Value "RH_PATH=$dir"
         } else {
-          Write-Error "❌ ResourceHacker.exe not found in extracted files"
-          exit 1
+          throw "ResourceHacker.exe not found"
         }
         
-        # Cleanup
-        Remove-Item -Path $tempZip -Force
+        Remove-Item -Path $zip -Force
+        Write-Host "Setup completed"
 
     - name: Verify Input Files
-      shell: powershell
+      shell: pwsh
       run: |
-        Write-Host "🔍 Verifying input files..."
+        Write-Host "Verifying input files..."
         
         $exePath = "${{ inputs.exe-path }}"
         $iconPath = "${{ inputs.icon-path }}"
         
         if (-not (Test-Path $exePath)) {
-          Write-Error "❌ Executable file not found: $exePath"
-          exit 1
+          throw "Executable file not found: $exePath"
         }
-        Write-Host "✅ Found executable: $exePath"
+        Write-Host "Found executable: $exePath"
         
         if (-not (Test-Path $iconPath)) {
-          Write-Error "❌ Icon file not found: $iconPath"
-          exit 1
+          throw "Icon file not found: $iconPath"
         }
-        Write-Host "✅ Found icon: $iconPath"
+        Write-Host "Found icon: $iconPath"
         
-        # Verify icon file is valid .ico
         if (-not $iconPath.EndsWith('.ico')) {
-          Write-Warning "⚠️  Icon file should have .ico extension"
+          Write-Warning "Icon file should have .ico extension"
         }
 
     - name: Replace Icon
       id: replace-icon
-      shell: powershell
+      shell: pwsh
       run: |
+        $ErrorActionPreference = 'Stop'
+        
         $exePath = "${{ inputs.exe-path }}"
         $iconPath = "${{ inputs.icon-path }}"
         $outputPath = "${{ inputs.output-path }}"
@@ -113,68 +108,52 @@ runs:
         $resourceType = "${{ inputs.resource-type }}"
         $resourceLang = "${{ inputs.resource-language }}"
         
-        # Determine output path
         if ([string]::IsNullOrWhiteSpace($outputPath)) {
           $outputPath = $exePath
-          Write-Host "📝 Output will overwrite input file: $outputPath"
+          Write-Host "Output will overwrite input file: $outputPath"
         } else {
-          Write-Host "📝 Output will be saved to: $outputPath"
+          Write-Host "Output will be saved to: $outputPath"
         }
         
-        # Build resource mask
         $mask = "$resourceType,$resourceName,$resourceLang"
+        $rhExe = [System.IO.Path]::Combine($env:RH_PATH, "ResourceHacker.exe")
         
-        # Build command
-        $rhExe = Join-Path $env:RH_PATH "ResourceHacker.exe"
+        Write-Host "Replacing icon with Resource Hacker..."
+        Write-Host "Executable: $exePath"
+        Write-Host "Icon: $iconPath"
+        Write-Host "Resource Mask: $mask"
         
-        Write-Host "🔧 Replacing icon with Resource Hacker..."
-        Write-Host "   Executable: $exePath"
-        Write-Host "   Icon: $iconPath"
-        Write-Host "   Resource Mask: $mask"
+        $logFile = [System.IO.Path]::Combine($env:TEMP, "resourcehacker_log.txt")
         
-        # Execute Resource Hacker
-        $logFile = "$env:TEMP\resourcehacker_log.txt"
-        
-        & $rhExe `
-          -open $exePath `
-          -save $outputPath `
-          -action addoverwrite `
-          -res $iconPath `
-          -mask $mask `
-          -log $logFile
+        & $rhExe -open $exePath -save $outputPath -action addoverwrite -res $iconPath -mask $mask -log $logFile
         
         $exitCode = $LASTEXITCODE
         
-        # Display log
         if (Test-Path $logFile) {
-          Write-Host "`n📋 Resource Hacker Log:"
-          Get-Content $logFile | ForEach-Object { Write-Host "   $_" }
+          Write-Host "`nResource Hacker Log:"
+          Get-Content $logFile | ForEach-Object { Write-Host "  $_" }
         }
         
-        # Check result
         if ($exitCode -ne 0) {
-          Write-Error "❌ Resource Hacker failed with exit code: $exitCode"
-          exit 1
+          throw "Resource Hacker failed with exit code: $exitCode"
         }
         
         if (-not (Test-Path $outputPath)) {
-          Write-Error "❌ Output file was not created: $outputPath"
-          exit 1
+          throw "Output file was not created: $outputPath"
         }
         
-        Write-Host "✅ Icon replaced successfully!"
-        Write-Host "📦 Output file: $outputPath"
+        Write-Host "Icon replaced successfully!"
+        Write-Host "Output file: $outputPath"
         
-        # Set output
-        "output-file=$outputPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "output-file=$outputPath"
 
     - name: Cleanup
       if: always()
-      shell: powershell
+      shell: pwsh
       run: |
-        Write-Host "🧹 Cleaning up temporary files..."
-        $extractPath = Join-Path $env:TEMP "ResourceHacker"
+        Write-Host "Cleaning up temporary files..."
+        $extractPath = [System.IO.Path]::Combine($env:TEMP, "ResourceHacker")
         if (Test-Path $extractPath) {
           Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
-          Write-Host "✅ Cleanup completed"
+          Write-Host "Cleanup completed"
         }
