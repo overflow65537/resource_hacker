@@ -41,12 +41,16 @@ runs:
     - name: Download Resource Hacker
       shell: powershell
       run: |
-        Write-Host "📥 Downloading Resource Hacker from official website..."
-        $downloadUrl = "https://angusj.com/resourcehacker/resource_hacker.zip"
-        $tempZip = "$env:TEMP\resource_hacker.zip"
-        $extractPath = "$env:TEMP\ResourceHacker"
-        
         $ErrorActionPreference = 'Stop'
+        Write-Host "📥 Downloading Resource Hacker from official website..."
+        
+        $downloadUrl = "https://angusj.com/resourcehacker/resource_hacker.zip"
+        $tempZip = Join-Path $env:TEMP "resource_hacker.zip"
+        $extractPath = Join-Path $env:TEMP "ResourceHacker"
+        
+        Write-Host "Download URL: $downloadUrl"
+        Write-Host "Temp ZIP: $tempZip"
+        Write-Host "Extract Path: $extractPath"
         
         # Download
         Invoke-WebRequest -Uri $downloadUrl -OutFile $tempZip -UseBasicParsing
@@ -63,7 +67,8 @@ runs:
         $rhExe = Get-ChildItem -Path $extractPath -Filter "ResourceHacker.exe" -Recurse | Select-Object -First 1
         if ($rhExe) {
           Write-Host "✅ Resource Hacker extracted to: $($rhExe.FullName)"
-          echo "RH_PATH=$($rhExe.DirectoryName)" >> $env:GITHUB_ENV
+          $rhDir = $rhExe.DirectoryName
+          "RH_PATH=$rhDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         } else {
           Write-Error "❌ ResourceHacker.exe not found in extracted files"
           exit 1
@@ -161,14 +166,14 @@ runs:
         Write-Host "📦 Output file: $outputPath"
         
         # Set output
-        echo "output-file=$outputPath" >> $env:GITHUB_OUTPUT
+        "output-file=$outputPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
     - name: Cleanup
       if: always()
       shell: powershell
       run: |
         Write-Host "🧹 Cleaning up temporary files..."
-        $extractPath = "$env:TEMP\ResourceHacker"
+        $extractPath = Join-Path $env:TEMP "ResourceHacker"
         if (Test-Path $extractPath) {
           Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
           Write-Host "✅ Cleanup completed"
