@@ -122,12 +122,16 @@ runs:
         Write-Host "Executable: $exePath"
         Write-Host "Icon: $iconPath"
         Write-Host "Resource Mask: $mask"
+        Write-Host "RH Path: $rhExe"
         
         $logFile = [System.IO.Path]::Combine($env:TEMP, "resourcehacker_log.txt")
         
-        & $rhExe -open $exePath -save $outputPath -action addoverwrite -res $iconPath -mask $mask -log $logFile
+        # Execute Resource Hacker
+        $process = Start-Process -FilePath $rhExe -ArgumentList "-open `"$exePath`" -save `"$outputPath`" -action addoverwrite -res `"$iconPath`" -mask $mask -log `"$logFile`"" -Wait -PassThru -NoNewWindow
         
-        $exitCode = $LASTEXITCODE
+        $exitCode = $process.ExitCode
+        
+        Write-Host "Exit Code: $exitCode"
         
         if (Test-Path $logFile) {
           Write-Host "`nResource Hacker Log:"
