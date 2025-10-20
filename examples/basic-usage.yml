@@ -1,0 +1,19 @@
+name: Basic Icon Replacement
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  replace-icon:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Replace application icon
+        uses: overflow65537/resource_hacker@v1
+        with:
+          exe-path: 'app.exe'
+          icon-path: 'icon.ico'

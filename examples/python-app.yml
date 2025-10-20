@@ -1,0 +1,41 @@
+name: Python App with Custom Icon
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-python-exe:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
+      
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed --name MyPythonApp main.py
+      
+      - name: Replace icon in executable
+        uses: overflow65537/resource_hacker@v1
+        with:
+          exe-path: 'dist/MyPythonApp.exe'
+          icon-path: 'resources/python-app.ico'
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyPythonApp-${{ github.ref_name }}
+          path: dist/MyPythonApp.exe

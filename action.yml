@@ -1,0 +1,178 @@
+name: 'Resource Hacker Icon Replacer'
+description: 'Automatically download Resource Hacker and replace application icons'
+author: 'overflow65537'
+
+branding:
+  icon: 'image'
+  color: 'blue'
+
+inputs:
+  exe-path:
+    description: 'Path to the executable file to modify'
+    required: true
+  icon-path:
+    description: 'Path to the new icon file (.ico)'
+    required: true
+  output-path:
+    description: 'Path for the output executable (optional, defaults to overwriting the input)'
+    required: false
+    default: ''
+  resource-name:
+    description: 'Resource name for the icon (default: MAINICON)'
+    required: false
+    default: 'MAINICON'
+  resource-type:
+    description: 'Resource type (default: ICONGROUP)'
+    required: false
+    default: 'ICONGROUP'
+  resource-language:
+    description: 'Resource language ID (default: 0 for neutral)'
+    required: false
+    default: '0'
+
+outputs:
+  output-file:
+    description: 'Path to the modified executable file'
+    value: ${{ steps.replace-icon.outputs.output-file }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Download Resource Hacker
+      shell: powershell
+      run: |
+        Write-Host "📥 Downloading Resource Hacker from official website..."
+        $downloadUrl = "https://angusj.com/resourcehacker/resource_hacker.zip"
+        $tempZip = "$env:TEMP\resource_hacker.zip"
+        $extractPath = "$env:TEMP\ResourceHacker"
+        
+        try {
+          # Download
+          Invoke-WebRequest -Uri $downloadUrl -OutFile $tempZip -UseBasicParsing
+          Write-Host "✅ Download completed"
+          
+          # Extract
+          Write-Host "📂 Extracting Resource Hacker..."
+          if (Test-Path $extractPath) {
+            Remove-Item -Path $extractPath -Recurse -Force
+          }
+          Expand-Archive -Path $tempZip -DestinationPath $extractPath -Force
+          
+          # Verify
+          $rhExe = Get-ChildItem -Path $extractPath -Filter "ResourceHacker.exe" -Recurse | Select-Object -First 1
+          if ($rhExe) {
+            Write-Host "✅ Resource Hacker extracted to: $($rhExe.FullName)"
+            echo "RH_PATH=$($rhExe.DirectoryName)" >> $env:GITHUB_ENV
+          } else {
+            Write-Error "❌ ResourceHacker.exe not found in extracted files"
+            exit 1
+          }
+          
+          # Cleanup
+          Remove-Item -Path $tempZip -Force
+        } catch {
+          Write-Error "❌ Failed to download or extract Resource Hacker: $_"
+          exit 1
+        }
+
+    - name: Verify Input Files
+      shell: powershell
+      run: |
+        Write-Host "🔍 Verifying input files..."
+        
+        $exePath = "${{ inputs.exe-path }}"
+        $iconPath = "${{ inputs.icon-path }}"
+        
+        if (-not (Test-Path $exePath)) {
+          Write-Error "❌ Executable file not found: $exePath"
+          exit 1
+        }
+        Write-Host "✅ Found executable: $exePath"
+        
+        if (-not (Test-Path $iconPath)) {
+          Write-Error "❌ Icon file not found: $iconPath"
+          exit 1
+        }
+        Write-Host "✅ Found icon: $iconPath"
+        
+        # Verify icon file is valid .ico
+        if (-not $iconPath.EndsWith('.ico')) {
+          Write-Warning "⚠️  Icon file should have .ico extension"
+        }
+
+    - name: Replace Icon
+      id: replace-icon
+      shell: powershell
+      run: |
+        $exePath = "${{ inputs.exe-path }}"
+        $iconPath = "${{ inputs.icon-path }}"
+        $outputPath = "${{ inputs.output-path }}"
+        $resourceName = "${{ inputs.resource-name }}"
+        $resourceType = "${{ inputs.resource-type }}"
+        $resourceLang = "${{ inputs.resource-language }}"
+        
+        # Determine output path
+        if ([string]::IsNullOrWhiteSpace($outputPath)) {
+          $outputPath = $exePath
+          Write-Host "📝 Output will overwrite input file: $outputPath"
+        } else {
+          Write-Host "📝 Output will be saved to: $outputPath"
+        }
+        
+        # Build resource mask
+        $mask = "$resourceType,$resourceName,$resourceLang"
+        
+        # Build command
+        $rhExe = Join-Path $env:RH_PATH "ResourceHacker.exe"
+        
+        Write-Host "🔧 Replacing icon with Resource Hacker..."
+        Write-Host "   Executable: $exePath"
+        Write-Host "   Icon: $iconPath"
+        Write-Host "   Resource Mask: $mask"
+        
+        # Execute Resource Hacker
+        $logFile = "$env:TEMP\resourcehacker_log.txt"
+        
+        & $rhExe `
+          -open $exePath `
+          -save $outputPath `
+          -action addoverwrite `
+          -res $iconPath `
+          -mask $mask `
+          -log $logFile
+        
+        $exitCode = $LASTEXITCODE
+        
+        # Display log
+        if (Test-Path $logFile) {
+          Write-Host "`n📋 Resource Hacker Log:"
+          Get-Content $logFile | ForEach-Object { Write-Host "   $_" }
+        }
+        
+        # Check result
+        if ($exitCode -ne 0) {
+          Write-Error "❌ Resource Hacker failed with exit code: $exitCode"
+          exit 1
+        }
+        
+        if (-not (Test-Path $outputPath)) {
+          Write-Error "❌ Output file was not created: $outputPath"
+          exit 1
+        }
+        
+        Write-Host "✅ Icon replaced successfully!"
+        Write-Host "📦 Output file: $outputPath"
+        
+        # Set output
+        echo "output-file=$outputPath" >> $env:GITHUB_OUTPUT
+
+    - name: Cleanup
+      if: always()
+      shell: powershell
+      run: |
+        Write-Host "🧹 Cleaning up temporary files..."
+        $extractPath = "$env:TEMP\ResourceHacker"
+        if (Test-Path $extractPath) {
+          Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "✅ Cleanup completed"
+        }

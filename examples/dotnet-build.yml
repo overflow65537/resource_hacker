@@ -1,0 +1,48 @@
+name: .NET Build and Customize
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-customize:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      
+      - name: Restore dependencies
+        run: dotnet restore
+      
+      - name: Build application
+        run: dotnet build --configuration Release --no-restore
+      
+      - name: Publish application
+        run: dotnet publish --configuration Release --output ./publish
+      
+      - name: Replace application icon
+        uses: overflow65537/resource_hacker@v1
+        with:
+          exe-path: './publish/MyApp.exe'
+          icon-path: './assets/app-icon.ico'
+      
+      - name: Create release archive
+        shell: powershell
+        run: |
+          Compress-Archive -Path ./publish/* -DestinationPath MyApp-${{ github.ref_name }}.zip
+      
+      - name: Upload release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./MyApp-${{ github.ref_name }}.zip
+          asset_name: MyApp-${{ github.ref_name }}.zip
+          asset_content_type: application/zip

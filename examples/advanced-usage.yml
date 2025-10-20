@@ -1,0 +1,56 @@
+name: Advanced Icon Replacement
+
+on:
+  workflow_dispatch:
+    inputs:
+      icon-name:
+        description: 'Icon file name'
+        required: true
+        default: 'custom.ico'
+
+jobs:
+  customize-multiple-apps:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # 示例 1: 替换主应用图标
+      - name: Replace main app icon
+        id: main-app
+        uses: overflow65537/resource_hacker@v1
+        with:
+          exe-path: 'build/MainApp.exe'
+          icon-path: 'icons/${{ github.event.inputs.icon-name }}'
+          output-path: 'dist/MainApp.exe'
+      
+      # 示例 2: 替换工具应用图标（保留原文件）
+      - name: Replace tool app icon
+        uses: overflow65537/resource_hacker@v1
+        with:
+          exe-path: 'build/Tool.exe'
+          icon-path: 'icons/tool.ico'
+          output-path: 'dist/Tool.exe'
+          resource-name: 'APPICON'
+      
+      # 示例 3: 批量处理多个文件
+      - name: Process multiple executables
+        shell: powershell
+        run: |
+          $exeFiles = Get-ChildItem -Path "build" -Filter "*.exe"
+          foreach ($exe in $exeFiles) {
+            Write-Host "Processing: $($exe.Name)"
+          }
+      
+      # 上传所有处理后的文件
+      - name: Upload customized applications
+        uses: actions/upload-artifact@v4
+        with:
+          name: customized-apps
+          path: dist/*.exe
+      
+      - name: Display results
+        run: |
+          echo "Main app output: ${{ steps.main-app.outputs.output-file }}"
+          echo "All applications customized successfully!"

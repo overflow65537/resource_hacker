@@ -1,0 +1,92 @@
+name: Test Action
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test-action:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Create test executable
+        shell: powershell
+        run: |
+          Write-Host "Creating test executable..."
+          
+          # Create a simple C# console app for testing
+          $code = @'
+          using System;
+          class Program {
+              static void Main() {
+                  Console.WriteLine("Test Application");
+              }
+          }
+'@
+          
+          Set-Content -Path "test.cs" -Value $code
+          
+          # Compile
+          csc /out:test.exe test.cs
+          
+          if (Test-Path "test.exe") {
+            Write-Host "✅ Test executable created"
+          } else {
+            Write-Error "❌ Failed to create test executable"
+            exit 1
+          }
+      
+      - name: Create test icon
+        shell: powershell
+        run: |
+          Write-Host "Creating test icon..."
+          
+          # Download a sample icon for testing
+          # Using a simple approach: create a 1x1 pixel icon (minimal valid .ico)
+          # For actual testing, you should use a proper .ico file
+          
+          $iconBytes = [System.Convert]::FromBase64String("AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA")
+          
+          [System.IO.File]::WriteAllBytes("$PWD\test.ico", $iconBytes)
+          
+          if (Test-Path "test.ico") {
+            Write-Host "✅ Test icon created"
+          } else {
+            Write-Error "❌ Failed to create test icon"
+            exit 1
+          }
+      
+      - name: Test icon replacement
+        uses: ./
+        with:
+          exe-path: 'test.exe'
+          icon-path: 'test.ico'
+          output-path: 'test_modified.exe'
+      
+      - name: Verify output
+        shell: powershell
+        run: |
+          if (Test-Path "test_modified.exe") {
+            Write-Host "✅ Modified executable exists"
+            $size = (Get-Item "test_modified.exe").Length
+            Write-Host "   File size: $size bytes"
+          } else {
+            Write-Error "❌ Modified executable not found"
+            exit 1
+          }
+      
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test.exe
+            test_modified.exe
+            test.ico
