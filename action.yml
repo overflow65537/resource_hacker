@@ -46,34 +46,31 @@ runs:
         $tempZip = "$env:TEMP\resource_hacker.zip"
         $extractPath = "$env:TEMP\ResourceHacker"
         
-        try {
-          # Download
-          Invoke-WebRequest -Uri $downloadUrl -OutFile $tempZip -UseBasicParsing
-          Write-Host "✅ Download completed"
-          
-          # Extract
-          Write-Host "📂 Extracting Resource Hacker..."
-          if (Test-Path $extractPath) {
-            Remove-Item -Path $extractPath -Recurse -Force
-          }
-          Expand-Archive -Path $tempZip -DestinationPath $extractPath -Force
-          
-          # Verify
-          $rhExe = Get-ChildItem -Path $extractPath -Filter "ResourceHacker.exe" -Recurse | Select-Object -First 1
-          if ($rhExe) {
-            Write-Host "✅ Resource Hacker extracted to: $($rhExe.FullName)"
-            echo "RH_PATH=$($rhExe.DirectoryName)" >> $env:GITHUB_ENV
-          } else {
-            Write-Error "❌ ResourceHacker.exe not found in extracted files"
-            exit 1
-          }
-          
-          # Cleanup
-          Remove-Item -Path $tempZip -Force
-        } catch {
-          Write-Error "❌ Failed to download or extract Resource Hacker: $_"
+        $ErrorActionPreference = 'Stop'
+        
+        # Download
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $tempZip -UseBasicParsing
+        Write-Host "✅ Download completed"
+        
+        # Extract
+        Write-Host "📂 Extracting Resource Hacker..."
+        if (Test-Path $extractPath) {
+          Remove-Item -Path $extractPath -Recurse -Force
+        }
+        Expand-Archive -Path $tempZip -DestinationPath $extractPath -Force
+        
+        # Verify
+        $rhExe = Get-ChildItem -Path $extractPath -Filter "ResourceHacker.exe" -Recurse | Select-Object -First 1
+        if ($rhExe) {
+          Write-Host "✅ Resource Hacker extracted to: $($rhExe.FullName)"
+          echo "RH_PATH=$($rhExe.DirectoryName)" >> $env:GITHUB_ENV
+        } else {
+          Write-Error "❌ ResourceHacker.exe not found in extracted files"
           exit 1
         }
+        
+        # Cleanup
+        Remove-Item -Path $tempZip -Force
 
     - name: Verify Input Files
       shell: powershell
