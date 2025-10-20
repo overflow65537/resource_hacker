@@ -15,28 +15,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      
       - name: Create test executable
         shell: powershell
         run: |
           Write-Host "Creating test executable..."
           
-          # Create a simple C# console app for testing
-          $code = @'
-          using System;
-          class Program {
-              static void Main() {
-                  Console.WriteLine("Test Application");
-              }
-          }
-'@
+          # Use dotnet to create a simple executable
+          Write-Host "Using dotnet to create executable..."
+          dotnet new console -n TestApp -o TestApp --force
           
-          Set-Content -Path "test.cs" -Value $code
+          # Modify Program.cs to be simple
+          Set-Content -Path "TestApp/Program.cs" -Value "using System; Console.WriteLine(`"Test Application`");"
           
-          # Compile
-          csc /out:test.exe test.cs
+          # Publish as self-contained exe
+          dotnet publish TestApp -c Release -o output --self-contained false
           
-          if (Test-Path "test.exe") {
+          # Find the exe file
+          $exeFile = Get-ChildItem -Path "output" -Filter "*.exe" | Select-Object -First 1
+          if ($exeFile) {
+            Copy-Item -Path $exeFile.FullName -Destination "test.exe"
             Write-Host "✅ Test executable created"
+            $size = (Get-Item "test.exe").Length
+            Write-Host "   File size: $size bytes"
           } else {
             Write-Error "❌ Failed to create test executable"
             exit 1
@@ -47,16 +52,16 @@ jobs:
         run: |
           Write-Host "Creating test icon..."
           
-          # Download a sample icon for testing
-          # Using a simple approach: create a 1x1 pixel icon (minimal valid .ico)
-          # For actual testing, you should use a proper .ico file
-          
-          $iconBytes = [System.Convert]::FromBase64String("AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA")
+          # Create a proper 16x16 icon file (valid .ico format)
+          # This is a minimal valid .ico file with a 16x16 blue square
+          $iconBytes = [System.Convert]::FromBase64String("AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///z////8/////P////z////8/////P////z////8/////P////z////8/////PwAAAAAAAAAAAAAAAP///z//////////////////////////////////////////////////////////////////////P////z8AAAAAAAAAAP///z//////////////////////////////////////////////////////////////////////P////z8AAAAAAAAAAP///z//////////////////////////////////////////////////////////////////////P////z8AAAAAAAAAAP///z//////////////////////////////////////////////////////////////////////P////z8AAAAAAAAAAP///z//////////////////////////////////////////////////////////////////////P////z8AAAAAAAAAAP///z//////////////////////////////////////////////////////////////////////P////z8AAAAAAAAAAP///z//////////////////////////////////////////////////////////////////////P////z8AAAAAAAAAAP///z//////////////////////////////////////////////////////////////////////P////z8AAAAAAAAAAP///z//////////////////////////////////////////////////////////////////////P////z8AAAAAAAAAAP///z//////////////////////////////////////////////////////////////////////P////z8AAAAAAAAAAP///z//////////////////////////////////////////////////////////////////////P////z8AAAAAAAAAAP///z//////////////////////////////////////////////////////////////////////P////z8AAAAAAAAAAP///z////8/////P////z////8/////P////z////8/////P////z////8/////PwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAA=")
           
           [System.IO.File]::WriteAllBytes("$PWD\test.ico", $iconBytes)
           
           if (Test-Path "test.ico") {
             Write-Host "✅ Test icon created"
+            $size = (Get-Item "test.ico").Length
+            Write-Host "   Icon file size: $size bytes"
           } else {
             Write-Error "❌ Failed to create test icon"
             exit 1
