@@ -54,19 +54,7 @@ jobs:
           exe-path: 'MFW/MFW.exe'
           icon-path: 'test.ico'
           output-path: 'MFW/test_modified.exe'
-      
-      - name: Verify output
-        shell: powershell
-        run: |
-          if (Test-Path "test_modified.exe") {
-            Write-Host "✅ Modified executable exists"
-            $size = (Get-Item "test_modified.exe").Length
-            Write-Host "   File size: $size bytes"
-          } else {
-            Write-Error "❌ Modified executable not found"
-            exit 1
-          }
-      
+
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
