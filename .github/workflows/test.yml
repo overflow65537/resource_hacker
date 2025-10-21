@@ -15,37 +15,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
       
-      - name: Create test executable
-        shell: powershell
-        run: |
-          Write-Host "Creating test executable..."
-          
-          # Use dotnet to create a simple executable
-          Write-Host "Using dotnet to create executable..."
-          dotnet new console -n TestApp -o TestApp --force
-          
-          # Modify Program.cs to be simple
-          Set-Content -Path "TestApp/Program.cs" -Value "using System; Console.WriteLine(`"Test Application`");"
-          
-          # Publish as self-contained exe
-          dotnet publish TestApp -c Release -o output --self-contained false
-          
-          # Find the exe file
-          $exeFile = Get-ChildItem -Path "output" -Filter "*.exe" | Select-Object -First 1
-          if ($exeFile) {
-            Copy-Item -Path $exeFile.FullName -Destination "test.exe"
-            Write-Host "✅ Test executable created"
-            $size = (Get-Item "test.exe").Length
-            Write-Host "   File size: $size bytes"
-          } else {
-            Write-Error "❌ Failed to create test executable"
-            exit 1
-          }
+      - name: Download MFW-CA
+        if: matrix.os != 'android'
+        id : download_mfw-ca
+        uses: robinraju/release-downloader@v1
+        with:
+          repository: overflow65537/MFW-PyQt6
+          fileName: "MFW-PyQt6-${{ matrix.os }}-${{ matrix.arch }}*"
+          latest: true
+          out-file-path: "MFW"
+          extract: true
+      
       
       - name: Create test icon
         shell: powershell
@@ -70,9 +51,9 @@ jobs:
       - name: Test icon replacement
         uses: ./
         with:
-          exe-path: 'test.exe'
+          exe-path: 'MFW/MFW.exe'
           icon-path: 'test.ico'
-          output-path: 'test_modified.exe'
+          output-path: 'MFW/test_modified.exe'
       
       - name: Verify output
         shell: powershell
@@ -91,7 +72,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: |
-            test.exe
-            test_modified.exe
-            test.ico
+          path: "MFW"
+            
