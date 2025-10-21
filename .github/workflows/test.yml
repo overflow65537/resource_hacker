@@ -22,7 +22,7 @@ jobs:
         uses: robinraju/release-downloader@v1
         with:
           repository: overflow65537/MFW-PyQt6
-          fileName: "MFW-PyQt6-${{ matrix.os }}-${{ matrix.arch }}*"
+          fileName: "MFW-PyQt6-win-x86_64*"
           latest: true
           out-file-path: "MFW"
           extract: true
